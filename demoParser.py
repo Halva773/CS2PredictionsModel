@@ -75,9 +75,15 @@ class GameStat:
         pistols = self.pistols_rounds()
         count_T = pistols.value_counts().get('T', 0)  # Количество T
         count_CT = pistols.value_counts().get('CT', 0)  # Количество CT
-        self.result_df['pistols'] = self.result_df['start_side'].map({'T': count_T, 'CT': count_CT})
+        self.result_df['pistols_won'] = self.result_df['start_side'].map({'T': count_T, 'CT': count_CT})
 
+        ct_won_rounds = t_side_rounds['ct started team'][1] + ct_side_rounds['ct started team'][1]
+        t_won_rounds = t_side_rounds['t started team'][1] + ct_side_rounds['t started team'][1]
+        self.result_df['lost_in_win'] = self.result_df['start_side'].map({'CT': t_won_rounds if ct_won_rounds > t_won_rounds else 0,
+                                                                             'T': ct_won_rounds if t_won_rounds > ct_won_rounds else 0})
 
+        self.result_df['won_in_loose'] = self.result_df['start_side'].map({'T': t_won_rounds if ct_won_rounds > t_won_rounds else 0,
+                                                                             'CT': ct_won_rounds if t_won_rounds > ct_won_rounds else 0})
 
         return self.result_df
 
@@ -342,12 +348,15 @@ def main():
     # src = "demos/mouz-nxt-vs-rhyno-m1-ancient.dem"
 
     # https://www.hltv.org/matches/2373595/parivision-vs-ence-skyesports-championship-2024\
-    src = 'demos/parivision-vs-ence-dust2.dem'
+    # src = 'demos/parivision-vs-ence-dust2.dem'
 
+    # https://www.hltv.org/matches/2373289/g2-vs-natus-vincere-esports-world-cup-2024
+    src = 'demos/natus-vincere-vs-virtus-pro-m1-overpass.dem'
     stat = GameStat(src)
+
     df = stat.complain_data()
     print(df.columns)
-    need_columns = ['start_side', 'pistols']
+    need_columns = ['start_side', 'won_in_loose', 'lost_in_win']
     print(df[need_columns])
 
     return stat
@@ -355,7 +364,6 @@ def main():
 
 if __name__ == '__main__':
     stat = main()
-
     # src = 'demos/parivision-vs-ence-dust2.dem'
     # stat = GameStat(src)
     # print(stat.ct_started())
