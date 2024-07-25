@@ -25,8 +25,13 @@ class GameStat:
 
         self.result_df['rounds_played'] = self.__cnt_rounds
         self.result_df['start_side'] = 'T'
-        for name, side in self.ct_started().items():
-            self.result_df.loc[name, 'start_side'] = side
+
+        for info in self.ct_started().items():
+            for name, side in info[1].items():
+                self.result_df.loc[name, 'start_side'] = side
+
+        # for name, side in self.ct_started().items():
+        #     self.result_df.loc[name, 'start_side'] = side
 
         self.result_df[['hard_clutches', 'light_clutches', 'team_clutches']] = 0
 
@@ -53,6 +58,27 @@ class GameStat:
         self.result_df.loc[self.result_df.start_side == 'T', '4v5_situations'] = single_entries['CT start team'][0]
         self.result_df.loc[self.result_df.start_side == 'T', '4v5_wins'] = single_entries['CT start team'][0] - \
                                                                            single_entries['CT start team'][1]
+
+        t_side_rounds, ct_side_rounds = self.sides_won()
+        self.result_df.loc[self.result_df.start_side == 'CT', 'ct_side_rounds_played'] = ct_side_rounds['ct started team'][0]
+        self.result_df.loc[self.result_df.start_side == 'CT', 'ct_side_rounds_won'] = ct_side_rounds['ct started team'][1]
+        self.result_df.loc[self.result_df.start_side == 'CT', 't_side_rounds_played'] = t_side_rounds['ct started team'][0]
+        self.result_df.loc[self.result_df.start_side == 'CT', 't_side_rounds_won'] = t_side_rounds['ct started team'][1]
+
+        self.result_df.loc[self.result_df.start_side == 'T', 'ct_side_rounds_played'] = ct_side_rounds['t started team'][0]
+        self.result_df.loc[self.result_df.start_side == 'T', 'ct_side_rounds_won'] = ct_side_rounds['t started team'][1]
+        self.result_df.loc[self.result_df.start_side == 'T', 't_side_rounds_played'] = t_side_rounds['t started team'][0]
+        self.result_df.loc[self.result_df.start_side == 'T', 't_side_rounds_won'] = t_side_rounds['t started team'][1]
+
+        # self.result_df[['ct_side_rounds_played', 'ct_side_rounds_won', 't_side_rounds_played', 't_side_rounds_won']] = 0
+
+        pistols = self.pistols_rounds()
+        count_T = pistols.value_counts().get('T', 0)  # Количество T
+        count_CT = pistols.value_counts().get('CT', 0)  # Количество CT
+        self.result_df['pistols'] = self.result_df['start_side'].map({'T': count_T, 'CT': count_CT})
+
+
+
         return self.result_df
 
     def base_stat(self):
@@ -165,9 +191,18 @@ class GameStat:
         return self.player_death_info[['user_name', 'user_utility_damage_total']].groupby('user_name').max()
 
     def ct_started(self):
+        sides = self.player_death_info[['user_team_name', 'user_name']].copy()
+        # Получаем уникальные значения
+        unique_sides = sides.drop_duplicates(subset='user_name', keep='first')
+        ct_sides = unique_sides[unique_sides['user_team_name'] == 'CT']
+
+        # Группируем по 'user_name' и берем максимальные значения
+        return ct_sides.groupby('user_name').max()
+
+
         player_death_info = self.player_death_info
         return player_death_info[(player_death_info['user_team_name'] == 'CT') & (
-                player_death_info['total_rounds_played'] == 0)].groupby('user_name').max()['user_team_name']
+                player_death_info['total_rounds_played'] == 0)][['user_team_name', 'user_name']].groupby('user_name').max()
 
     def sniper_kilss(self):
         columns_list = ['attacker_name', 'weapon']
@@ -288,21 +323,39 @@ class GameStat:
                                                       ct_side['t started team'][1] + second_half_rounds_played]
         return t_side, ct_side
 
+    def pistols_rounds(self):
+        pistols = self.round_ended[:24:12].winner.copy()
+        if pistols.loc[12] == 'T':
+            pistols.loc[12] = 'CT'
+        elif pistols.loc[12] == 'CT':
+            pistols.loc[12] = 'T'
+        return pistols
 
 def main():
-    # https://www.hltv.org/matches/2373289/g2-vs-natus-vincere-esports-world-cup-2024
-    src = 'demos/g2-vs-natus-vincere-m1-ancient.dem'
+    #  https://www.hltv.org/matches/2373289/g2-vs-natus-vincere-esports-world-cup-2024
+    # src = 'demos/g2-vs-natus-vincere-m1-ancient.dem'
+
+    #  https://www.hltv.org/matches/2373975/red-canids-vs-kr-iem-rio-2024-south-america-open-qualifier-1
+    # src = 'demos/red-canids-vs-kru-nuke.dem'
+
+    #  https://www.hltv.org/matches/2373559/mouz-nxt-vs-rhyno-res-regional-series-6-europe
     # src = "demos/mouz-nxt-vs-rhyno-m1-ancient.dem"
+
+    # https://www.hltv.org/matches/2373595/parivision-vs-ence-skyesports-championship-2024\
+    src = 'demos/parivision-vs-ence-dust2.dem'
+
     stat = GameStat(src)
     df = stat.complain_data()
     print(df.columns)
-    need_columns = ['start_side', 'utility_damage', '4_kills']
-    print(df)
+    need_columns = ['start_side', 'pistols']
+    print(df[need_columns])
+
     return stat
 
 
 if __name__ == '__main__':
-    # stat = main()
-    src = 'demos/red-canids-vs-kru-nuke.dem'
-    stat = GameStat(src)
-    print(stat.sides_won())
+    stat = main()
+
+    # src = 'demos/parivision-vs-ence-dust2.dem'
+    # stat = GameStat(src)
+    # print(stat.ct_started())
